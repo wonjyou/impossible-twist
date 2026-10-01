@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Impossible Twist</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+  body { background: radial-gradient(ellipse at 50% 46%, #1b1b1b 0%, #0a0a0a 55%, #000 100%); }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+  canvas { transition: opacity 0.18s ease; }
+  canvas.swap { opacity: 0; }
+  canvas.dragging { cursor: grabbing; }
+  .label {
+    position: fixed; bottom: 28px; color: #fff; pointer-events: none; user-select: none;
+    font: 300 11px/1 -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    letter-spacing: 0.32em; text-transform: uppercase;
+  }
+  #title { top: 36px; bottom: auto; left: 32px; opacity: 0.85; }
+  #hint { right: 32px; opacity: 0.45; transition: opacity 1.2s ease; }
+  #hint.done { opacity: 0; }
+  @media (max-width: 760px) { #hint { display: none; } }
+
+  #switcher {
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+    display: grid; grid-template-columns: 34px minmax(0, 300px) 34px; align-items: center; column-gap: 14px;
+    max-width: calc(100vw - 32px); color: #fff; text-align: center; user-select: none;
+    font: 300 12px/1.45 -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+  #switcher button {
+    width: 34px; height: 34px; padding: 0 0 2px; border: 1px solid rgba(255,255,255,0.45); border-radius: 50%;
+    background: transparent; color: #fff; font: 300 17px/1 -apple-system, "Helvetica Neue", Arial, sans-serif;
+    cursor: pointer; opacity: 0.7; transition: opacity 0.2s ease, background 0.2s ease;
+  }
+  #switcher button:hover, #switcher button:focus-visible { opacity: 1; background: rgba(255,255,255,0.12); outline: none; }
+  #s-count { font-size: 10px; letter-spacing: 0.28em; color: rgba(255,255,255,0.5); }
+  #s-name { margin: 3px 0 4px; font-size: 13px; letter-spacing: 0.32em; text-transform: uppercase; text-indent: 0.32em; }
+  #s-theme { color: rgba(255,255,255,0.6); min-height: 2.9em; }
+
+  #help-btn {
+    position: fixed; top: 24px; right: 28px; width: 34px; height: 34px; padding: 0;
+    border: 1px solid rgba(255,255,255,0.45); border-radius: 50%; background: transparent; color: #fff;
+    font: 300 15px/1 -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; cursor: pointer;
+    opacity: 0.7; transition: opacity 0.2s ease, background 0.2s ease;
+  }
+  #help-btn:hover, #help-btn:focus-visible { opacity: 1; background: rgba(255,255,255,0.12); outline: none; }
+
+  #help {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px;
+    background: rgba(0,0,0,0.72); opacity: 0; visibility: hidden;
+    transition: opacity 0.25s ease, visibility 0.25s;
+  }
+  #help.open { opacity: 1; visibility: visible; }
+  #help .panel {
+    position: relative; box-sizing: border-box; width: 100%; max-width: 460px; max-height: 100%; overflow: auto;
+    padding: 30px 32px 26px; background: #0b0b0b; border: 1px solid rgba(255,255,255,0.35); color: #fff;
+    font: 300 14px/1.5 -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+  #help h2 { margin: 0 0 6px; font-weight: 300; font-size: 11px; letter-spacing: 0.32em; text-transform: uppercase; }
+  #help h3 { margin: 22px 0 8px; font-weight: 400; font-size: 10px; letter-spacing: 0.28em; text-transform: uppercase; color: rgba(255,255,255,0.55); }
+  #help p { margin: 0; color: rgba(255,255,255,0.7); }
+  #help dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 9px 18px; }
+  #help dt { color: #fff; white-space: nowrap; }
+  #help dd { margin: 0; color: rgba(255,255,255,0.7); }
+  #help kbd {
+    display: inline-block; min-width: 1.1em; padding: 1px 5px; text-align: center;
+    border: 1px solid rgba(255,255,255,0.45); border-radius: 3px; font: inherit; font-size: 12px;
+  }
+  #help-x {
+    position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    border: 0; border-radius: 50%; background: transparent; color: #fff; cursor: pointer;
+    opacity: 0.7; transition: opacity 0.2s ease, background 0.2s ease;
+  }
+  #help-x:hover, #help-x:focus-visible { opacity: 1; background: rgba(255,255,255,0.12); outline: none; }
+  #help-close {
+    display: block; margin: 26px 0 0 auto; padding: 8px 16px; background: #fff; color: #000; border: 0; cursor: pointer;
+    font: 400 10px/1 -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; letter-spacing: 0.28em; text-transform: uppercase;
+  }
+  #help-close:hover, #help-close:focus-visible { background: #bbb; outline: none; }
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="A black and white impossible structure. Drag to twist it."></canvas>
+<div class="label" id="title">Impossible Twist</div>
+<div class="label" id="hint">Drag to twist</div>
+<div id="switcher" role="group" aria-label="Choose a structure">
+  <button id="s-prev" type="button" aria-label="Previous structure">&lsaquo;</button>
+  <div aria-live="polite">
+    <div id="s-count"></div>
+    <div id="s-name"></div>
+    <div id="s-theme"></div>
+  </div>
+  <button id="s-next" type="button" aria-label="Next structure">&rsaquo;</button>
+</div>
+<button id="help-btn" type="button" aria-label="How to control the structure" aria-haspopup="dialog">?</button>
+<div id="help" role="dialog" aria-modal="true" aria-labelledby="help-title" aria-hidden="true">
+  <div class="panel">
+    <button id="help-x" type="button" aria-label="Close help">
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"/></svg>
+    </button>
+    <h2 id="help-title">How to twist</h2>
+    <p>The structure always comes to rest in one of 24 positions. From some of them, separate floors line up and look joined.</p>
+    <h3>Mouse or touch</h3>
+    <dl>
+      <dt>Drag left / right</dt><dd>Turn the structure around.</dd>
+      <dt>Drag up / down</dt><dd>Tip it over. The side under your pointer rolls up to become the floor, or down to become a wall.</dd>
+      <dt>Let go</dt><dd>It settles into the nearest position. A quick flick carries it to the next one.</dd>
+    </dl>
+    <h3>Structures</h3>
+    <dl>
+      <dt>&lsaquo; and &rsaquo; buttons</dt><dd>Step through the structures. Each one opens in its front view.</dd>
+    </dl>
+    <h3>Keyboard</h3>
+    <dl>
+      <dt><kbd>&larr;</kbd> <kbd>&rarr;</kbd></dt><dd>Turn a quarter turn.</dd>
+      <dt><kbd>&uarr;</kbd> <kbd>&darr;</kbd></dt><dd>Tip the left side up or down.</dd>
+      <dt><kbd>Shift</kbd> + <kbd>&uarr;</kbd> <kbd>&darr;</kbd></dt><dd>Tip the right side up or down.</dd>
+      <dt><kbd>P</kbd> <kbd>N</kbd></dt><dd>Previous or next structure.</dd>
+      <dt><kbd>1</kbd> &ndash; <kbd>9</kbd></dt><dd>Jump straight to a structure.</dd>
+      <dt><kbd>?</kbd> or <kbd>H</kbd></dt><dd>Open or close this help.</dd>
+    </dl>
+    <button id="help-close" type="button">Got it</button>
+  </div>
+</div>
+<script src="main.js"></script>
+</body>
+</html>
